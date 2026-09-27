@@ -741,6 +741,8 @@ export class IntegrationRepository {
     });
   }
 
+  // A disconnected channel keeps its row for the post history, but its
+  // access tokens are wiped (privacy policy); reconnecting stores new ones
   deleteChannel(org: string, id: string) {
     return this._integration.model.integration.update({
       where: {
@@ -749,6 +751,8 @@ export class IntegrationRepository {
       },
       data: {
         deletedAt: new Date(),
+        token: '',
+        refreshToken: null,
       },
     });
   }
