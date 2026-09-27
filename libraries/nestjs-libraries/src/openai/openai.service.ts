@@ -326,4 +326,83 @@ Clips must not overlap. Write the title and the post in this language, whatever 
 
     return [];
   }
+
+  // Uses the web search tool so the angles come from what is being talked
+  // about right now and not from the model's training data
+  async researchTrends(theme: string, language: string, count: number) {
+    const research = await openai.responses.create({
+      model: 'gpt-4.1',
+      tools: [{ type: 'web_search' }],
+      input: `Search the web for what is trending right now (the last days and weeks) about the theme "${theme}", for an audience that speaks ${language}.
+Find ${count} different angles that would make a strong social media post today: recent news, launches, debates, data or viral discussions.
+For every angle write a short title, two or three sentences with the concrete facts (names, numbers, dates) and the URLs of the sources you used.`,
+    });
+
+    return research.output_text;
+  }
+
+  async generateCampaignPosts(params: {
+    theme: string;
+    research: string;
+    count: number;
+    language: string;
+    tone?: string;
+    instructions?: string;
+    platforms: string[];
+  }) {
+    const CampaignPostsPrompt = z.object({
+      posts: z.array(
+        z.object({
+          trend: z
+            .string()
+            .describe('Short title of the trending angle the post is about'),
+          sources: z
+            .array(z.string())
+            .describe('URLs from the research that back the post'),
+          content: z.string().describe('The social media post, plain text'),
+          imagePrompt: z
+            .string()
+            .describe(
+              'Prompt to generate the image of the post, no text inside the picture'
+            ),
+        })
+      ),
+    });
+
+    return (
+      (
+        await openai.chat.completions.parse({
+          model: 'gpt-4.1',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a social media copywriter. Using only the research you get, write ${
+                params.count
+              } posts about the theme "${
+                params.theme
+              }", each one about a different trending angle.
+The posts will be published on: ${params.platforms.join(', ')}. Write them so they work on all of these platforms: a strong first line, short paragraphs separated by an empty line, up to 1200 characters and at most 3 hashtags at the end.
+Never invent facts that are not in the research.
+Write the posts in this language, whatever the language of these instructions: ${
+                params.language
+              }.${params.tone ? `\nTone of voice: ${params.tone}.` : ''}${
+                params.instructions
+                  ? `\nExtra instructions from the user: ${params.instructions}`
+                  : ''
+              }
+For every post also write an image prompt in English that illustrates it, the image must not contain any text.`,
+            },
+            {
+              role: 'user',
+              content: params.research,
+            },
+          ],
+          response_format: zodResponseFormat(
+            CampaignPostsPrompt,
+            'campaignPosts'
+          ),
+        })
+      ).choices[0].message.parsed?.posts || []
+    );
+  }
 }

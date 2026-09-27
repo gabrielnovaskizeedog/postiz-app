@@ -1,7 +1,14 @@
 import { FC } from 'react';
 import clsx from 'clsx';
 
-type CreationMethod = 'UNKNOWN' | 'WEB' | 'API' | 'MCP' | 'AUTOPOST' | 'CLI';
+type CreationMethod =
+  | 'UNKNOWN'
+  | 'WEB'
+  | 'API'
+  | 'MCP'
+  | 'AUTOPOST'
+  | 'CLI'
+  | 'AI_CAMPAIGN';
 
 interface Props {
   creationMethod?: CreationMethod | string | null;
@@ -11,7 +18,11 @@ interface Props {
 }
 
 const tooltipFor = (m: string) =>
-  m === 'AUTOPOST' ? 'Auto-posted by system' : `Created via ${m}`;
+  m === 'AUTOPOST'
+    ? 'Auto-posted by system'
+    : m === 'AI_CAMPAIGN'
+    ? 'Created by an AI campaign'
+    : `Created via ${m}`;
 
 export const CreationMethodBadge: FC<Props> = ({
   creationMethod,
@@ -38,13 +49,14 @@ export const CreationMethodBadge: FC<Props> = ({
         creationMethod === 'MCP' && 'bg-[#9333ea]',
         creationMethod === 'AUTOPOST' && 'bg-[#d97706]',
         creationMethod === 'CLI' && 'bg-[#0f766e]',
+        creationMethod === 'AI_CAMPAIGN' && 'bg-[#612BD3]',
         className
       )}
       style={ringColor ? { boxShadow: `0 0 0 2px ${ringColor}` } : undefined}
       data-tooltip-id="tooltip"
       data-tooltip-content={tooltipFor(creationMethod)}
     >
-      {creationMethod}
+      {creationMethod === 'AI_CAMPAIGN' ? 'AI' : creationMethod}
     </div>
   );
 };

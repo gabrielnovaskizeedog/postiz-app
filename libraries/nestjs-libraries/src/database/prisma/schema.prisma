@@ -22,6 +22,8 @@ model Organization {
   isTrailing          Boolean              @default(false)
   shortlink           ShortLinkPreference  @default(ASK)
   autoPost            AutoPost[]
+  aiCampaigns         AiCampaign[]
+  aiCampaignPosts     AiCampaignPost[]
   Comments            Comments[]
   credits             Credits[]
   clippings           Clipping[]
@@ -700,6 +702,56 @@ model Sets {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
+}
+
+model AiCampaign {
+  id             String           @id @default(uuid())
+  organizationId String
+  themes         String
+  quantity       Int
+  integrations   String
+  startDate      DateTime
+  intervalDays   Int              @default(1)
+  language       String
+  tone           String?
+  instructions   String?
+  generateImages Boolean          @default(true)
+  status         String           @default("generating")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  posts          AiCampaignPost[]
+
+  @@index([organizationId])
+  @@index([deletedAt])
+}
+
+model AiCampaignPost {
+  id             String       @id @default(uuid())
+  campaignId     String
+  organizationId String
+  theme          String
+  trend          String?
+  sources        String?
+  content        String?
+  imagePrompt    String?
+  imageId        String?
+  imagePath      String?
+  publishDate    DateTime
+  status         String       @default("generating")
+  error          String?
+  postGroup      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  campaign       AiCampaign   @relation(fields: [campaignId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([campaignId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([deletedAt])
 }
 
 model ThirdParty {
@@ -1790,6 +1842,7 @@ enum CreationMethod {
   API
   AUTOPOST
   CLI
+  AI_CAMPAIGN
 }
 
 enum ShortLinkPreference {
