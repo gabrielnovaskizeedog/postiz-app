@@ -7,6 +7,7 @@ import {
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import dayjs from 'dayjs';
 import {
+  NotEnoughScopes,
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -151,6 +152,15 @@ export class InstagramStandaloneProvider
       })
     ).json();
 
+    if (!getAccessToken?.access_token) {
+      console.log('Instagram code exchange failed', getAccessToken);
+      throw new NotEnoughScopes(
+        `Instagram: ${
+          getAccessToken?.error_message || 'could not exchange the code'
+        }`
+      );
+    }
+
     const { access_token, expires_in, ...all } = await (
       await fetch(
         'https://graph.instagram.com/access_token' +
@@ -163,11 +173,29 @@ export class InstagramStandaloneProvider
 
     this.checkScopes(this.scopes, getAccessToken.permissions);
 
-    const { user_id, name, username, profile_picture_url } = await (
+    // Meta explains why a connection failed, keep that message instead of
+    // ending with a generic "Invalid API key"
+    if (!access_token) {
+      console.log('Instagram long-lived token exchange failed', all);
+      throw new NotEnoughScopes(
+        `Instagram: ${all?.error?.message || 'could not get a long-lived token'}`
+      );
+    }
+
+    const me = await (
       await fetch(
         `https://graph.instagram.com/${META_GRAPH_API_VERSION}/me?fields=user_id,username,name,profile_picture_url&access_token=${access_token}`
       )
     ).json();
+
+    if (!me?.user_id) {
+      console.log('Instagram profile request failed', me);
+      throw new NotEnoughScopes(
+        `Instagram: ${me?.error?.message || 'could not read the account'}`
+      );
+    }
+
+    const { user_id, name, username, profile_picture_url } = me;
 
     return {
       id: user_id,
