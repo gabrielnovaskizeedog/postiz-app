@@ -1109,5 +1109,11 @@
   "could_not_optimize_file": "Could not optimize the file, the original will be used",
   "total": "Total",
   "auth_hero_title": "Your social media on autopilot, with AI and your approval",
-  "auth_hero_description": "Pick your themes, AI finds what is trending, writes the posts and creates the images. You approve, SocialNovaskIA publishes on every network."
+  "auth_hero_description": "Pick your themes, AI finds what is trending, writes the posts and creates the images. You approve, SocialNovaskIA publishes on every network.",
+  "ai_campaign_instagram_format": "Instagram format",
+  "ai_campaign_format_post": "Feed post",
+  "ai_campaign_format_story": "Story",
+  "ai_campaign_format_post_description": "Square photo, the text goes in the caption",
+  "ai_campaign_format_story_description": "Vertical photo with the hook written on it, stories have no caption",
+  "ai_campaign_story_needs_image": "required for stories"
 }

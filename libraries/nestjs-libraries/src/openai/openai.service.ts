@@ -448,10 +448,21 @@ Never use abstract or symbolic concepts: no glowing brains, circuits, holograms,
     }));
   }
 
+  // Stories have no caption, the hook has to be written on the picture
+  realisticStoryPrompt(scene: string, headline: string) {
+    return `${this.realisticPhotoPrompt(scene, true)}
+
+Exception to the no-text rule: this is a vertical Instagram Story. Add exactly this headline, spelled exactly like this, once, in the upper third of the image, inside a safe margin of 10% from every edge:
+"${headline}"
+Typography: bold, clean modern sans-serif (like Inter or Helvetica Neue), white letters, large and easy to read on a phone, left-aligned, at most 4 lines, on a subtle dark gradient over the photo so it stays legible. No other text, no logos, no stickers, no emojis. The photo itself must still follow every rule above.`;
+  }
+
   // Wraps the scene written by generateCampaignPosts so the picture looks
   // like a real photograph and not like an AI render
-  realisticPhotoPrompt(scene: string) {
-    return `A real, unretouched photograph, indistinguishable from a picture taken by a professional photojournalist for a newspaper or a business magazine.
+  realisticPhotoPrompt(scene: string, isVertical = false) {
+    return `A real, unretouched ${
+      isVertical ? 'vertical (portrait orientation) ' : ''
+    }photograph, indistinguishable from a picture taken by a professional photojournalist for a newspaper or a business magazine.
 
 Scene: ${scene}
 

@@ -716,6 +716,7 @@ model AiCampaign {
   tone           String?
   instructions   String?
   generateImages Boolean          @default(true)
+  instagramFormat String          @default("post")
   status         String           @default("generating")
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

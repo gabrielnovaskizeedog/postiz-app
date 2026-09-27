@@ -1107,5 +1107,11 @@
   "could_not_optimize_file": "Não foi possível otimizar o arquivo, o original será usado",
   "total": "Total",
   "auth_hero_title": "Suas redes sociais no piloto automático, com IA e com a sua aprovação",
-  "auth_hero_description": "Escolha os temas, a IA encontra o que está em alta, escreve os posts e cria as imagens. Você aprova e o SocialNovaskIA publica em todas as redes."
+  "auth_hero_description": "Escolha os temas, a IA encontra o que está em alta, escreve os posts e cria as imagens. Você aprova e o SocialNovaskIA publica em todas as redes.",
+  "ai_campaign_instagram_format": "Formato no Instagram",
+  "ai_campaign_format_post": "Post no feed",
+  "ai_campaign_format_story": "Story",
+  "ai_campaign_format_post_description": "Foto quadrada, o texto vai na legenda",
+  "ai_campaign_format_story_description": "Foto vertical com a chamada escrita nela, Story não tem legenda",
+  "ai_campaign_story_needs_image": "obrigatório para Story"
 }

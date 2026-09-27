@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsDateString,
   IsDefined,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -58,6 +59,10 @@ export class AiCampaignDto {
   @IsBoolean()
   @IsDefined()
   generateImages: boolean;
+
+  @IsIn(['post', 'story'])
+  @IsOptional()
+  instagramFormat?: 'post' | 'story';
 }
 
 export class AiCampaignPostDto {

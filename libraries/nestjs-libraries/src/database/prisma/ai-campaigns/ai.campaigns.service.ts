@@ -17,12 +17,19 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 
 dayjs.extend(utc);
 
-// Settings some providers refuse to schedule without, campaigns publish
-// regular feed posts
-const REQUIRED_SETTINGS: Record<string, Record<string, unknown>> = {
-  instagram: { post_type: 'post' },
-  'instagram-standalone': { post_type: 'post' },
-};
+// Settings some providers refuse to schedule without, Instagram publishes
+// the format the user picked for the campaign (feed post or story)
+const requiredSettings = (
+  identifier: string,
+  campaign: { instagramFormat: string }
+): Record<string, unknown> =>
+  ['instagram', 'instagram-standalone'].includes(identifier)
+    ? { post_type: campaign.instagramFormat }
+    : {};
+
+// The hook is the first line of the post, stories show it on the picture
+const headlineOf = (content?: string | null) =>
+  (content || '').split('\n').find((line) => line.trim())?.trim() || '';
 
 type CampaignPost = Awaited<
   ReturnType<AiCampaignsRepository['createCampaign']>
@@ -62,6 +69,11 @@ export class AiCampaignsService {
         .add(index * body.intervalDays, 'day')
         .toDate(),
     }));
+
+    // A story is only a picture, it can not be published without one
+    if (body.instagramFormat === 'story') {
+      body.generateImages = true;
+    }
 
     const campaign = await this._aiCampaignsRepository.createCampaign(
       org.id,
@@ -118,7 +130,7 @@ export class AiCampaignsService {
 
     await this.lockPost(org.id, post.id, 'generating');
 
-    this.runRegenerateImage(org, post.id, post.imagePrompt).catch((err) =>
+    this.runRegenerateImage(org, post).catch((err) =>
       this.failPost(org.id, post.id, err)
     );
 
@@ -159,7 +171,7 @@ export class AiCampaignsService {
           group,
           settings: {
             __type: integration.providerIdentifier as any,
-            ...(REQUIRED_SETTINGS[integration.providerIdentifier] || {}),
+            ...requiredSettings(integration.providerIdentifier, post.campaign),
           } as any,
           value: [
             {
@@ -279,7 +291,13 @@ export class AiCampaignsService {
           }
 
           try {
-            const media = await this.createImage(org, item.imagePrompt);
+            const media = await this.createImage(
+              org,
+              item.imagePrompt,
+              campaign.instagramFormat === 'story'
+                ? headlineOf(item.content)
+                : undefined
+            );
             await this._aiCampaignsRepository.updatePost(org.id, post.id, {
               status: 'pending',
               imageId: media.id,
@@ -341,11 +359,17 @@ export class AiCampaignsService {
 
   private async runRegenerateImage(
     org: Organization,
-    id: string,
-    prompt: string
+    post: NonNullable<Awaited<ReturnType<AiCampaignsRepository['getPost']>>>
   ) {
+    const id = post.id;
     try {
-      const media = await this.createImage(org, prompt);
+      const media = await this.createImage(
+        org,
+        post.imagePrompt!,
+        post.campaign.instagramFormat === 'story'
+          ? headlineOf(post.content)
+          : undefined
+      );
       await this._aiCampaignsRepository.updatePost(org.id, id, {
         status: 'pending',
         imageId: media.id,
@@ -360,7 +384,12 @@ export class AiCampaignsService {
     }
   }
 
-  private async createImage(org: Organization, prompt: string) {
+  // With a story headline the picture is vertical and carries the hook
+  private async createImage(
+    org: Organization,
+    prompt: string,
+    storyHeadline?: string
+  ) {
     // Same credit gate as the dashboard's /media/generate-image route
     const total = await this._subscriptionService.checkCredits(org);
     if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
@@ -368,8 +397,12 @@ export class AiCampaignsService {
     }
 
     const image = await this._mediaService.generateImage(
-      this._openaiService.realisticPhotoPrompt(prompt),
-      org
+      storyHeadline
+        ? this._openaiService.realisticStoryPrompt(prompt, storyHeadline)
+        : this._openaiService.realisticPhotoPrompt(prompt),
+      org,
+      false,
+      !!storyHeadline
     );
     const file = await this.storage.uploadSimple(
       'data:image/png;base64,' + image

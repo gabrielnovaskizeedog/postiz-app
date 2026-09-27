@@ -40,10 +40,13 @@ interface Campaign {
   quantity: number;
   integrations: string;
   language: string;
+  instagramFormat: 'post' | 'story';
   status: string;
   createdAt: string;
   posts: CampaignPost[];
 }
+
+const INSTAGRAM_PROVIDERS = ['instagram', 'instagram-standalone'];
 
 const inputClassName =
   'w-full h-[44px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#612BD3]';
@@ -106,12 +109,25 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
   const [tone, setTone] = useState('');
   const [instructions, setInstructions] = useState('');
   const [generateImages, setGenerateImages] = useState(true);
+  const [instagramFormat, setInstagramFormat] = useState<'post' | 'story'>(
+    'post'
+  );
   const [loading, setLoading] = useState(false);
 
   const activeIntegrations = useMemo(
     () => (integrations || []).filter((p) => !p.disabled && !p.inBetweenSteps),
     [integrations]
   );
+
+  const hasInstagram = useMemo(
+    () =>
+      activeIntegrations.some(
+        (p) =>
+          selected.includes(p.id) && INSTAGRAM_PROVIDERS.includes(p.identifier)
+      ),
+    [activeIntegrations, selected]
+  );
+  const isStory = hasInstagram && instagramFormat === 'story';
 
   const addTheme = useCallback(() => {
     const value = themeInput.trim();
@@ -145,7 +161,8 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
         language,
         tone: tone || undefined,
         instructions: instructions || undefined,
-        generateImages,
+        generateImages: isStory || generateImages,
+        instagramFormat: hasInstagram ? instagramFormat : 'post',
       }),
     });
     setLoading(false);
@@ -180,6 +197,9 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
     tone,
     instructions,
     generateImages,
+    isStory,
+    hasInstagram,
+    instagramFormat,
   ]);
 
   const canSubmit =
@@ -339,13 +359,61 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
         />
       </div>
 
-      <label className="flex items-center gap-[8px] cursor-pointer">
+      {hasInstagram && (
+        <div className="flex flex-col gap-[6px]">
+          <div>{t('ai_campaign_instagram_format', 'Instagram format')}</div>
+          <div className="grid grid-cols-2 gap-[8px]">
+            {(['post', 'story'] as const).map((format) => (
+              <div
+                key={format}
+                onClick={() => setInstagramFormat(format)}
+                className={clsx(
+                  'flex flex-col gap-[2px] px-[12px] py-[10px] rounded-[8px] border cursor-pointer',
+                  instagramFormat === format
+                    ? 'border-[#612BD3] bg-[#612BD3]/10'
+                    : 'border-newBorder opacity-60'
+                )}
+              >
+                <div className="font-[600]">
+                  {format === 'post'
+                    ? t('ai_campaign_format_post', 'Feed post')
+                    : t('ai_campaign_format_story', 'Story')}
+                </div>
+                <div className="text-[12px] opacity-80">
+                  {format === 'post'
+                    ? t(
+                        'ai_campaign_format_post_description',
+                        'Square photo, the text goes in the caption'
+                      )
+                    : t(
+                        'ai_campaign_format_story_description',
+                        'Vertical photo with the hook written on it, stories have no caption'
+                      )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <label
+        className={clsx(
+          'flex items-center gap-[8px]',
+          isStory ? 'opacity-60' : 'cursor-pointer'
+        )}
+      >
         <input
           type="checkbox"
-          checked={generateImages}
+          disabled={isStory}
+          checked={isStory || generateImages}
           onChange={(e) => setGenerateImages(e.target.checked)}
         />
         {t('ai_campaign_generate_images', 'Generate an AI image for every post')}
+        {isStory && (
+          <span className="text-[12px]">
+            ({t('ai_campaign_story_needs_image', 'required for stories')})
+          </span>
+        )}
       </label>
 
       <div className="flex gap-[8px] justify-end">
@@ -360,10 +428,11 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
   );
 };
 
-const PostCard: FC<{ post: CampaignPost; onChange: () => void }> = ({
-  post,
-  onChange,
-}) => {
+const PostCard: FC<{
+  post: CampaignPost;
+  isStory: boolean;
+  onChange: () => void;
+}> = ({ post, isStory, onChange }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -456,8 +525,15 @@ const PostCard: FC<{ post: CampaignPost; onChange: () => void }> = ({
       )}
     >
       <div className="flex justify-between items-center gap-[8px]">
-        <div className="text-[12px] px-[8px] py-[2px] rounded-[6px] bg-newBgColorInner border border-newBorder truncate">
-          {post.theme}
+        <div className="flex items-center gap-[6px] min-w-0">
+          <div className="text-[12px] px-[8px] py-[2px] rounded-[6px] bg-newBgColorInner border border-newBorder truncate">
+            {post.theme}
+          </div>
+          {isStory && (
+            <div className="text-[12px] px-[8px] py-[2px] rounded-[6px] bg-[#612BD3] text-white whitespace-nowrap">
+              {t('ai_campaign_format_story', 'Story')}
+            </div>
+          )}
         </div>
         <div
           className={clsx(
@@ -473,7 +549,12 @@ const PostCard: FC<{ post: CampaignPost; onChange: () => void }> = ({
 
       {post.status === 'generating' ? (
         <div className="flex flex-col gap-[8px]">
-          <div className="w-full aspect-square bg-newSep rounded-[8px] animate-pulse" />
+          <div
+            className={clsx(
+              'w-full bg-newSep rounded-[8px] animate-pulse',
+              isStory ? 'aspect-[2/3]' : 'aspect-square'
+            )}
+          />
           <div className="h-[80px] bg-newSep rounded-[8px] animate-pulse" />
         </div>
       ) : (
@@ -481,7 +562,10 @@ const PostCard: FC<{ post: CampaignPost; onChange: () => void }> = ({
           {post.imagePath && (
             <img
               src={post.imagePath}
-              className="w-full aspect-square object-cover rounded-[8px]"
+              className={clsx(
+                'w-full object-cover rounded-[8px]',
+                isStory ? 'aspect-[2/3]' : 'aspect-square'
+              )}
               alt={post.trend || post.theme}
             />
           )}
@@ -659,6 +743,7 @@ const CampaignCard: FC<{
           <PostCard
             key={`${post.id}-${post.status}-${post.content?.length}-${post.imagePath}`}
             post={post}
+            isStory={campaign.instagramFormat === 'story'}
             onChange={onChange}
           />
         ))}
