@@ -359,38 +359,72 @@ For every angle write a short title, two or three sentences with the concrete fa
           sources: z
             .array(z.string())
             .describe('URLs from the research that back the post'),
-          content: z.string().describe('The social media post, plain text'),
+          headline: z
+            .string()
+            .describe(
+              'The hook: one short, punchy line that stops the scroll, max 110 characters'
+            ),
+          body: z
+            .string()
+            .describe(
+              'The rest of the post, plain text, short paragraphs separated by an empty line'
+            ),
           imagePrompt: z
             .string()
             .describe(
-              'Prompt to generate the image of the post, no text inside the picture'
+              'English description of a real photograph that illustrates the post'
             ),
         })
       ),
     });
 
-    return (
+    const posts =
       (
         await openai.chat.completions.parse({
           model: 'gpt-4.1',
+          temperature: 0.9,
           messages: [
             {
               role: 'system',
-              content: `You are a social media copywriter. Using only the research you get, write ${
+              content: `You are a senior social media copywriter and former journalist who ghostwrites for founders and executives. Your posts get read because they sound like a sharp, well-informed person talking, never like a machine or a press release.
+
+# Task
+Using ONLY the facts in the research the user sends, write ${
                 params.count
               } posts about the theme "${
                 params.theme
-              }", each one about a different trending angle.
-The posts will be published on: ${params.platforms.join(', ')}. Write them so they work on all of these platforms: a strong first line, short paragraphs separated by an empty line, up to 1200 characters and at most 3 hashtags at the end.
-Never invent facts that are not in the research.
-Write the posts in this language, whatever the language of these instructions: ${
+              }". Each post covers a different trending angle from the research.
+The posts will be published on: ${params.platforms.join(', ')}.
+Write in this language, whatever the language of these instructions: ${
                 params.language
-              }.${params.tone ? `\nTone of voice: ${params.tone}.` : ''}${
+              }. Write like a native speaker of that language would, with its natural idioms, not like a translation.${
+                params.tone ? `\nTone of voice: ${params.tone}.` : ''
+              }${
                 params.instructions
-                  ? `\nExtra instructions from the user: ${params.instructions}`
+                  ? `\nExtra instructions from the user (follow them): ${params.instructions}`
                   : ''
               }
-For every post also write an image prompt in English that illustrates it, the image must not contain any text.`,
+
+# Structure of every post
+1. headline: the hook, one line, max 110 characters. It is the most important part: it must stop someone scrolling. Use a concrete, surprising fact or number from the research, a bold claim you can back up, a tension or a contrast. It must make sense on its own and create curiosity to read the rest. No clickbait lies, no question marks as a lazy trick, no emojis, no hashtags.
+2. body: shorter and calmer than the headline promise, it delivers the details. 2 to 4 short paragraphs separated by an empty line, 250 to 800 characters in total. Explain what happened, why it matters to the reader and one concrete takeaway or opinion. You may end with a genuine, specific question to the reader, but only if it is natural, never a generic "What do you think?". Up to 2 relevant hashtags on the last line, or none.
+
+# Sound human, not AI (strict)
+- Vary sentence length. Mix very short sentences with longer ones. Fragments are fine.
+- Be specific: names, numbers, dates, places from the research. Specific beats generic every time.
+- Take a point of view. A real person has an opinion, you can too, as long as the facts are right.
+- Plain words. Write like you talk to a smart colleague.
+- NEVER use these patterns or their equivalents in the target language: "In today's fast-paced world", "In an ever-evolving landscape", "Let's dive in", "delve", "unlock", "unleash", "game-changer", "revolutionize", "harness the power", "navigate the complexities", "it's not just X, it's Y", "the future is here", "buckle up", "here's the thing", "Imagine a world", "Did you know?" as an opener, "In conclusion", "Let's explore", "Neste post", "Vamos explorar", "No mundo atual", "cada vez mais" as filler, "revolucionário", "Descubra como".
+- No lists of three adjectives or three parallel phrases in a row. No em dashes (—). No emoji bullets, at most one emoji in the whole post and only if it adds meaning.
+- No bold or markdown, no headers, no "Key takeaways", no bullet lists: plain text only.
+- Do not start two posts the same way.
+
+# Facts
+Never invent facts, numbers, quotes or names that are not in the research. If the research is thin on an angle, write a smaller claim instead of making something up. Put the URLs you used in sources.
+
+# Image
+For every post write imagePrompt in English: a scene a professional photographer could actually shoot today, directly connected to the post. Describe real people, a real place, real objects and what is happening: who, where, doing what, time of day and light, framing (close-up, medium shot, wide shot). Prefer candid, documentary moments over posed ones.
+Never use abstract or symbolic concepts: no glowing brains, circuits, holograms, robots, rockets, light bulbs, puzzle pieces, handshakes in front of a skyline, people pointing at floating screens, futuristic cities. No text, letters, logos or readable screens in the scene: avoid whiteboards, charts, slides, projections, posters, documents or monitors with visible content; if a screen or paper appears it is turned away or out of focus.`,
             },
             {
               role: 'user',
@@ -402,7 +436,40 @@ For every post also write an image prompt in English that illustrates it, the im
             'campaignPosts'
           ),
         })
-      ).choices[0].message.parsed?.posts || []
-    );
+      ).choices[0].message.parsed?.posts || [];
+
+    // Em dashes are the most recognisable sign of AI writing, the model
+    // still slips one in from time to time
+    const humanize = (text: string) => text.trim().replace(/\s*—\s*/g, ' - ');
+
+    return posts.map(({ headline, body, ...post }) => ({
+      ...post,
+      content: `${humanize(headline)}\n\n${humanize(body)}`,
+    }));
+  }
+
+  // Wraps the scene written by generateCampaignPosts so the picture looks
+  // like a real photograph and not like an AI render
+  realisticPhotoPrompt(scene: string) {
+    return `A real, unretouched photograph, indistinguishable from a picture taken by a professional photojournalist for a newspaper or a business magazine.
+
+Scene: ${scene}
+
+Photography:
+- Shot on a full-frame camera (Sony A7 IV or Canon EOS R5) with a 35mm or 50mm prime lens, aperture around f/2.8, natural depth of field.
+- Available, natural light only (window light, overcast daylight, office or street lights). Soft, believable shadows, realistic dynamic range, slightly imperfect exposure.
+- Candid, unposed moment, as if the subject did not notice the camera. Slightly off-center, natural framing, a little of the surroundings cut at the edges.
+- True-to-life, neutral colors, like a straight-out-of-camera JPEG. No color grading, no teal and orange, not oversaturated, not HDR.
+- Subtle sensor noise and fine grain, tiny lens imperfections, real micro-details.
+
+People (if any):
+- Ordinary, diverse, real-looking people of different ages and body types, not models.
+- Natural skin with pores, fine lines, small blemishes and uneven tones. Real hair with flyaways. Natural, relaxed expressions, not smiling at the camera.
+- Everyday clothes with wrinkles and folds. Hands with five natural fingers doing something plausible.
+
+Environment:
+- A real place with everyday clutter and wear: cables, papers, coffee cups, scuffs, fingerprints, uneven surfaces.
+
+It must NOT look like: a 3D render, CGI, digital art, an illustration, a painting, a stock photo, an advertisement or a movie still. No plastic or airbrushed skin, no perfect symmetry, no glowing or neon light, no lens flares, no dramatic cinematic lighting, no futuristic or sci-fi elements. No text, letters, numbers, logos, watermarks or readable screens anywhere in the image.`;
   }
 }

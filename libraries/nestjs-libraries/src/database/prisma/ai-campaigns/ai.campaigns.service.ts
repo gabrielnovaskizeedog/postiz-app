@@ -359,7 +359,10 @@ export class AiCampaignsService {
       throw new Error('No AI image credits are available on this account');
     }
 
-    const image = await this._mediaService.generateImage(prompt, org);
+    const image = await this._mediaService.generateImage(
+      this._openaiService.realisticPhotoPrompt(prompt),
+      org
+    );
     const file = await this.storage.uploadSimple(
       'data:image/png;base64,' + image
     );
