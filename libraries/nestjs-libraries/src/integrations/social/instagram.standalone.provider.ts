@@ -161,35 +161,62 @@ export class InstagramStandaloneProvider
       );
     }
 
-    const { access_token, expires_in, ...all } = await (
-      await fetch(
-        'https://graph.instagram.com/access_token' +
-          '?grant_type=ig_exchange_token' +
-          `&client_id=${process.env.INSTAGRAM_APP_ID}` +
-          `&client_secret=${process.env.INSTAGRAM_APP_SECRET}` +
-          `&access_token=${getAccessToken.access_token}`
-      )
+    this.checkScopes(this.scopes, getAccessToken.permissions);
+
+    // Documented request first (GET without client_id), Meta answered the
+    // old one with "Unsupported request - method type: get"
+    const exchangeParams = new URLSearchParams({
+      grant_type: 'ig_exchange_token',
+      client_secret: process.env.INSTAGRAM_APP_SECRET!,
+      access_token: getAccessToken.access_token,
+    });
+    let longLived = await (
+      await fetch(`https://graph.instagram.com/access_token?${exchangeParams}`)
     ).json();
 
-    this.checkScopes(this.scopes, getAccessToken.permissions);
+    if (!longLived?.access_token) {
+      console.log('Instagram long-lived token exchange failed (GET)', longLived);
+      longLived = await (
+        await fetch('https://graph.instagram.com/access_token', {
+          method: 'POST',
+          body: exchangeParams,
+        })
+      ).json();
+    }
 
     // Meta explains why a connection failed, keep that message instead of
     // ending with a generic "Invalid API key"
-    if (!access_token) {
-      console.log('Instagram long-lived token exchange failed', all);
+    if (!longLived?.access_token) {
+      console.log('Instagram long-lived token exchange failed (POST)', longLived);
       throw new NotEnoughScopes(
-        `Instagram: ${all?.error?.message || 'could not get a long-lived token'}`
+        `Instagram: ${
+          longLived?.error?.message || 'could not get a long-lived token'
+        }`
       );
     }
 
-    const me = await (
+    const { access_token } = longLived;
+    const fields = 'user_id,username,name,profile_picture_url';
+
+    // Instagram login tokens are read through the numeric user id returned
+    // by the code exchange, /me is only a fallback
+    let me = await (
       await fetch(
-        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/me?fields=user_id,username,name,profile_picture_url&access_token=${access_token}`
+        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${getAccessToken.user_id}?fields=${fields}&access_token=${access_token}`
       )
     ).json();
 
     if (!me?.user_id) {
-      console.log('Instagram profile request failed', me);
+      console.log('Instagram profile request failed (user id)', me);
+      me = await (
+        await fetch(
+          `https://graph.instagram.com/${META_GRAPH_API_VERSION}/me?fields=${fields}&access_token=${access_token}`
+        )
+      ).json();
+    }
+
+    if (!me?.user_id) {
+      console.log('Instagram profile request failed (me)', me);
       throw new NotEnoughScopes(
         `Instagram: ${me?.error?.message || 'could not read the account'}`
       );

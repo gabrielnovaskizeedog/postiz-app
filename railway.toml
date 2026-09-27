@@ -1,3 +1,8 @@
 [phases.setup]
     nixPkgs = ['nodejs', 'python3']
     aptPkgs = ['build-essential', 'libudev-dev']
+# The backend sometimes hangs while booting, only switch traffic to a new
+# deployment once the backend (PORT=3000) answers
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
