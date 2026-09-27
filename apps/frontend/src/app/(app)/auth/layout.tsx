@@ -3,7 +3,7 @@ import { getT } from '@gitroom/react/translation/get.translation.service.backend
 export const dynamic = 'force-dynamic';
 import { ReactNode } from 'react';
 import loadDynamic from 'next/dynamic';
-import { TestimonialComponent } from '@gitroom/frontend/components/auth/testimonial.component';
+import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { Toaster } from '@gitroom/react/toaster/toaster';
@@ -27,14 +27,22 @@ export default async function AuthLayout({
             <div className="flex">{children}</div>
           </div>
         </div>
-        <div className="text-[36px] flex-1 pt-[88px] hidden lg:flex flex-col items-center">
-          <div className="text-center">
-            Over <span className="text-[42px] text-[#FC69FF]">20,000+</span>{' '}
-            Entrepreneurs use
-            <br />
-            Postiz To Grow Their Social Presence
+        <div className="flex-1 hidden lg:flex flex-col items-center justify-center gap-[28px] px-[40px] text-center">
+          <div className="scale-[2.2] mb-[40px]">
+            <Logo />
           </div>
-          <TestimonialComponent />
+          <div className="text-[40px] leading-[1.15] font-[600] max-w-[640px]">
+            {t(
+              'auth_hero_title',
+              'Your social media on autopilot, with AI and your approval'
+            )}
+          </div>
+          <div className="text-[18px] opacity-70 max-w-[560px]">
+            {t(
+              'auth_hero_description',
+              'Pick your themes, AI finds what is trending, writes the posts and creates the images. You approve, SocialNovaskIA publishes on every network.'
+            )}
+          </div>
         </div>
       </div>
     </MantineWrapper>

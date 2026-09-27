@@ -22,7 +22,7 @@ export const remoteMcpClients = {
 } as const;
 
 // Official one-click connectors listed in the assistants' directories.
-// Only for the hosted Postiz (billingEnabled), they point at the public MCP server.
+// Only for the hosted SocialNovaskIA (billingEnabled), they point at the public MCP server.
 export const mcpConnectorUrls = {
   Claude: 'https://claude.ai/directory/postiz',
   ChatGPT:
@@ -35,7 +35,7 @@ export const mcpConnectorUrls = {
 // the agent installs the CLI itself and asks you for the API key
 export const chatOnlyMcpClients = {
   'Grok Bot':
-    'Install the Postiz CLI with `npm install -g postiz`, then install the Postiz skill with `npx skills add gitroomhq/postiz-agent`. Ask me for my Postiz API key and set it as the POSTIZ_API_KEY environment variable before using the CLI.',
+    'Install the Postiz CLI with `npm install -g postiz`, then install the Postiz skill with `npx skills add gitroomhq/postiz-agent`. Ask me for my SocialNovaskIA API key and set it as the POSTIZ_API_KEY environment variable before using the CLI.',
 } as const;
 
 export const mcpClients = [
@@ -57,7 +57,7 @@ export type ChatOnlyMcpClient = keyof typeof chatOnlyMcpClients;
 export type McpClient = (typeof mcpClients)[number];
 export type AnyMcpClient = RemoteMcpClient | ChatOnlyMcpClient | McpClient;
 
-// oauth: no API key, the client registers itself (DCR) and the user signs in to Postiz
+// oauth: no API key, the client registers itself (DCR) and the user signs in to SocialNovaskIA
 // apikey: the organization API key, as a Bearer header (or inside the URL for remote clients)
 export type McpAuth = 'oauth' | 'apikey';
 
@@ -156,7 +156,7 @@ export const getMcpConfig = (
       case 'NanoClaw':
         return {
           config: `ncl groups config add-mcp-server --id <group-id> --name postiz --url ${oauthUrl}`,
-          hint: 'Run this in your terminal, replace <group-id> with the agent group that should get Postiz.',
+          hint: 'Run this in your terminal, replace <group-id> with the agent group that should get SocialNovaskIA.',
         };
     }
   }
@@ -255,7 +255,7 @@ export const getMcpConfig = (
       // No headers flag, the key travels inside the URL like remote clients
       return {
         config: `ncl groups config add-mcp-server --id <group-id> --name postiz --url ${mcpBase}/mcp/${apiKey}`,
-        hint: 'Run this in your terminal, replace <group-id> with the agent group that should get Postiz.',
+        hint: 'Run this in your terminal, replace <group-id> with the agent group that should get SocialNovaskIA.',
       };
   }
 };
@@ -337,7 +337,7 @@ const McpSection = ({
           <div className="text-[13px] text-customColor18 mt-[2px]">
             {t(
               'connect_your_mcp_client_to_postiz_to_schedule_your_posts_faster',
-              'Connect Postiz MCP server to your client (Http streaming) to schedule your posts faster.'
+              'Connect SocialNovaskIA MCP server to your client (Http streaming) to schedule your posts faster.'
             )}
           </div>
         </div>
@@ -392,7 +392,7 @@ const McpSection = ({
                   onClick={() => setAuth(m)}
                 >
                   {m === 'oauth'
-                    ? t('sign_in_no_api_key', 'Sign in with Postiz (no API key)')
+                    ? t('sign_in_no_api_key', 'Sign in with SocialNovaskIA (no API key)')
                     : t('api_key', 'API Key')}
                 </button>
               ))}
@@ -435,7 +435,7 @@ const McpSection = ({
               !chatOnly &&
               ` ${t(
                 'oauth_sign_in_hint',
-                'Your agent will open a browser window to sign in to Postiz.'
+                'Your agent will open a browser window to sign in to SocialNovaskIA.'
               )}`}
           </div>
           <pre className="bg-newBgColorInner border border-newBorder rounded-[8px] p-[16px] text-[13px] whitespace-pre-wrap break-all overflow-x-auto leading-[1.6]">
@@ -713,7 +713,7 @@ const PublicApiContent = () => {
         <br />
         {t(
           'api_auth_note_line2',
-          'If you are building a product that schedules posts on behalf of other Postiz users,'
+          'If you are building a product that schedules posts on behalf of other SocialNovaskIA users,'
         )}
         <br />
         {t(
@@ -735,7 +735,7 @@ const PublicApiContent = () => {
             <div className="text-[13px] text-customColor18 mt-[2px]">
               {t(
                 'use_postiz_api_to_integrate_with_your_tools',
-                'Use Postiz API to integrate with your tools.'
+                'Use SocialNovaskIA API to integrate with your tools.'
               )}
             </div>
           </div>
