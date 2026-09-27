@@ -184,6 +184,23 @@ export class InstagramStandaloneProvider
       ).json();
     }
 
+    // Meta now answers the documented exchange with IGApiException code 100
+    // "Unsupported request" for some apps, other integrations keep the token
+    // of the code exchange in that case instead of failing the connection
+    if (!longLived?.access_token && longLived?.error?.code === 100) {
+      console.log(
+        'Instagram long-lived exchange unsupported, keeping the code exchange token',
+        {
+          fields: Object.keys(getAccessToken),
+          expires_in: getAccessToken.expires_in,
+        }
+      );
+      longLived = {
+        access_token: getAccessToken.access_token,
+        expires_in: getAccessToken.expires_in,
+      };
+    }
+
     // Meta explains why a connection failed, keep that message instead of
     // ending with a generic "Invalid API key"
     if (!longLived?.access_token) {
