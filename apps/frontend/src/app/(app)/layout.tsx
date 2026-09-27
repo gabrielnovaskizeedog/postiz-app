@@ -41,6 +41,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <html>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        {/* Installable app (PWA), the phone opens it on /m */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#0E0E0E" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="SocialNovaskIA" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         {!!process.env.DATAFAST_WEBSITE_ID && (
           <Script
             data-website-id={process.env.DATAFAST_WEBSITE_ID}

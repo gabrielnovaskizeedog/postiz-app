@@ -67,6 +67,14 @@ export class AiCampaignDto {
   @IsIn(['premium', 'economy'])
   @IsOptional()
   aiModel?: 'premium' | 'economy';
+
+  // Exact dates picked by the user (weekly planner), one per post, computed
+  // in the browser so the user's timezone is respected
+  @IsArray()
+  @IsOptional()
+  @ArrayMaxSize(30)
+  @IsDateString({}, { each: true })
+  publishDates?: string[];
 }
 
 export class AiCampaignPostDto {

@@ -286,6 +286,8 @@ export class PostsRepository {
         select: {
           id: true,
           content: true,
+          // the mobile agenda shows a thumbnail of the post
+          image: true,
           publishDate: true,
           releaseURL: true,
           releaseId: true,

@@ -64,13 +64,18 @@ export class AiCampaignsService {
       throw new BadRequestException('Select at least one active channel');
     }
 
-    // Themes take turns so every theme gets its share of the posts,
-    // one post every `intervalDays` starting from `startDate`
+    // Themes take turns so every theme gets its share of the posts, on the
+    // dates picked by the user or one post every `intervalDays` from startDate
+    if (body.publishDates?.length) {
+      body.quantity = body.publishDates.length;
+    }
     const posts = Array.from({ length: body.quantity }).map((_, index) => ({
       theme: body.themes[index % body.themes.length],
-      publishDate: dayjs(body.startDate)
-        .add(index * body.intervalDays, 'day')
-        .toDate(),
+      publishDate: body.publishDates?.length
+        ? dayjs(body.publishDates[index]).toDate()
+        : dayjs(body.startDate)
+            .add(index * body.intervalDays, 'day')
+            .toDate(),
     }));
 
     // A story is only a picture, it can not be published without one

@@ -99,7 +99,7 @@ const toLocalInput = (date: string | Date) =>
 const fromLocalInput = (value: string) =>
   dayjs.tz(value, getTimezone()).utc().format();
 
-const useIntegrationsList = () => {
+export const useIntegrationsList = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     return (await (await fetch('/integrations/list')).json()).integrations;
@@ -111,7 +111,7 @@ const useIntegrationsList = () => {
   });
 };
 
-const useAiCampaigns = () => {
+export const useAiCampaigns = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     return (await fetch('/ai-campaigns')).json();
@@ -131,10 +131,34 @@ const useAiCampaigns = () => {
   });
 };
 
-const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
-  onCreated,
-  onCancel,
-}) => {
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
+
+// Dates of the picked weekdays in this or next week at the picked time, in
+// the user's timezone, skipping the ones already in the past
+const weeklyDates = (week: 'this' | 'next', weekdays: number[], time: string) => {
+  const [hour, minute] = time.split(':').map(Number);
+  const now = dayjs().tz(getTimezone());
+  const monday = now
+    .startOf('day')
+    .subtract((now.day() + 6) % 7, 'day')
+    .add(week === 'next' ? 7 : 0, 'day');
+  return WEEKDAYS.filter((day) => weekdays.includes(day))
+    .map((day) =>
+      monday
+        .add((day + 6) % 7, 'day')
+        .hour(hour || 0)
+        .minute(minute || 0)
+        .second(0)
+    )
+    .filter((date) => date.isAfter(now));
+};
+
+export const NewCampaign: FC<{
+  onCreated: () => void;
+  onCancel: () => void;
+  // Mobile: plan the posts of a week (days + time) instead of an interval
+  weekly?: boolean;
+}> = ({ onCreated, onCancel, weekly }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -155,7 +179,16 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
     'post'
   );
   const [aiModel, setAiModel] = useState<AiModel>('premium');
+  const [week, setWeek] = useState<'this' | 'next'>('next');
+  const [weekdays, setWeekdays] = useState<number[]>([1, 3, 5]);
+  const [time, setTime] = useState('10:00');
   const [loading, setLoading] = useState(false);
+
+  const plannedDates = useMemo(
+    () => (weekly ? weeklyDates(week, weekdays, time) : []),
+    [weekly, week, weekdays, time]
+  );
+  const postCount = weekly ? plannedDates.length : quantity;
 
   const activeIntegrations = useMemo(
     () => (integrations || []).filter((p) => !p.disabled && !p.inBetweenSteps),
@@ -197,10 +230,15 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
       method: 'POST',
       body: JSON.stringify({
         themes,
-        quantity,
+        quantity: postCount,
         integrations: selected,
-        startDate: fromLocalInput(startDate),
-        intervalDays,
+        startDate: weekly
+          ? plannedDates[0]?.utc().format()
+          : fromLocalInput(startDate),
+        intervalDays: weekly ? 1 : intervalDays,
+        ...(weekly
+          ? { publishDates: plannedDates.map((date) => date.utc().format()) }
+          : {}),
         language,
         tone: tone || undefined,
         instructions: instructions || undefined,
@@ -245,10 +283,16 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
     hasInstagram,
     instagramFormat,
     aiModel,
+    weekly,
+    plannedDates,
+    postCount,
   ]);
 
   const canSubmit =
-    themes.length > 0 && selected.length > 0 && quantity > 0 && !!startDate;
+    themes.length > 0 &&
+    selected.length > 0 &&
+    postCount > 0 &&
+    (weekly || !!startDate);
 
   return (
     <div className="flex flex-col gap-[16px] text-[14px]">
@@ -332,6 +376,86 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
         </div>
       </div>
 
+      {weekly ? (
+        <div className="flex flex-col gap-[10px]">
+          <div className="grid grid-cols-2 gap-[8px]">
+            {(['this', 'next'] as const).map((value) => (
+              <div
+                key={value}
+                onClick={() => setWeek(value)}
+                className={clsx(
+                  'px-[12px] py-[10px] rounded-[8px] border cursor-pointer text-center',
+                  week === value
+                    ? 'border-[#612BD3] bg-[#612BD3]/10'
+                    : 'border-newBorder opacity-60'
+                )}
+              >
+                {value === 'this'
+                  ? t('ai_campaign_this_week', 'This week')
+                  : t('ai_campaign_next_week', 'Next week')}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            <div>{t('ai_campaign_weekdays', 'Posting days')}</div>
+            <div className="grid grid-cols-7 gap-[4px]">
+              {WEEKDAYS.map((day) => (
+                <div
+                  key={day}
+                  onClick={() =>
+                    setWeekdays((current) =>
+                      current.includes(day)
+                        ? current.filter((p) => p !== day)
+                        : [...current, day]
+                    )
+                  }
+                  className={clsx(
+                    'h-[40px] rounded-[8px] border flex items-center justify-center cursor-pointer text-[13px] capitalize',
+                    weekdays.includes(day)
+                      ? 'border-[#612BD3] bg-[#612BD3] text-white'
+                      : 'border-newBorder opacity-60'
+                  )}
+                >
+                  {new Intl.DateTimeFormat(undefined, { weekday: 'short' })
+                    .format(dayjs().day(day).toDate())
+                    .replace('.', '')}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            <div>{t('ai_campaign_time', 'Time')}</div>
+            <input
+              type="time"
+              className={inputClassName}
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+            />
+          </div>
+          <div className="text-[13px] opacity-80">
+            {plannedDates.length
+              ? `${plannedDates.length} ${t(
+                  'ai_campaign_posts',
+                  'posts'
+                )}: ${plannedDates
+                  .map((date) =>
+                    date.toDate().toLocaleString(undefined, {
+                      weekday: 'short',
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: getTimezone(),
+                    })
+                  )
+                  .join(' · ')}`
+              : t(
+                  'ai_campaign_no_dates',
+                  'Pick at least one day that has not passed yet'
+                )}
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-[12px]">
         <div className="flex flex-col gap-[6px]">
           <div>{t('ai_campaign_quantity', 'Number of posts')}</div>
@@ -365,6 +489,7 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
           />
         </div>
       </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-[12px]">
         <div className="flex flex-col gap-[6px]">
@@ -496,7 +621,7 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
                   ≈ {formatCost(perPost)}{' '}
                   {t('ai_campaign_per_post', 'per post')} ·{' '}
                   <span className="font-[600]">
-                    ≈ {formatCost(perPost * Math.max(quantity || 0, 0))}{' '}
+                    ≈ {formatCost(perPost * Math.max(postCount || 0, 0))}{' '}
                     {t('ai_campaign_for_campaign', 'for this campaign')}
                   </span>
                 </div>
@@ -770,7 +895,7 @@ const PostCard: FC<{
   );
 };
 
-const CampaignCard: FC<{
+export const CampaignCard: FC<{
   campaign: Campaign;
   integrations: IntegrationItem[];
   onChange: () => void;
