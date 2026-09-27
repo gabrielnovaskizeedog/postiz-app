@@ -32,6 +32,7 @@ interface CampaignPost {
   publishDate: string;
   status: 'generating' | 'pending' | 'approved' | 'rejected' | 'failed';
   error?: string;
+  cost: number;
 }
 
 interface Campaign {
@@ -41,12 +42,53 @@ interface Campaign {
   integrations: string;
   language: string;
   instagramFormat: 'post' | 'story';
+  aiModel: AiModel;
   status: string;
   createdAt: string;
   posts: CampaignPost[];
 }
 
 const INSTAGRAM_PROVIDERS = ['instagram', 'instagram-standalone'];
+
+type AiModel = 'premium' | 'economy';
+
+// Estimates measured on real campaigns (USD per post): web search + writing,
+// and one picture (square feed post or vertical story)
+const AI_MODELS: Record<
+  AiModel,
+  { text: string; image: string; textCost: number; post: number; story: number }
+> = {
+  premium: {
+    text: 'GPT-4.1',
+    image: 'ChatGPT Image (high)',
+    textCost: 0.04,
+    post: 0.15,
+    story: 0.2,
+  },
+  economy: {
+    text: 'GPT-4.1 mini',
+    image: 'GPT Image 1 mini (medium)',
+    textCost: 0.016,
+    post: 0.0095,
+    story: 0.0125,
+  },
+};
+
+const formatCost = (value: number) =>
+  value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: value < 0.1 ? 3 : 2,
+  });
+
+const estimatePostCost = (
+  model: AiModel,
+  generateImages: boolean,
+  isStory: boolean
+) =>
+  AI_MODELS[model].textCost +
+  (generateImages ? AI_MODELS[model][isStory ? 'story' : 'post'] : 0);
 
 const inputClassName =
   'w-full h-[44px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#612BD3]';
@@ -112,6 +154,7 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
   const [instagramFormat, setInstagramFormat] = useState<'post' | 'story'>(
     'post'
   );
+  const [aiModel, setAiModel] = useState<AiModel>('premium');
   const [loading, setLoading] = useState(false);
 
   const activeIntegrations = useMemo(
@@ -163,6 +206,7 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
         instructions: instructions || undefined,
         generateImages: isStory || generateImages,
         instagramFormat: hasInstagram ? instagramFormat : 'post',
+        aiModel,
       }),
     });
     setLoading(false);
@@ -200,6 +244,7 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
     isStory,
     hasInstagram,
     instagramFormat,
+    aiModel,
   ]);
 
   const canSubmit =
@@ -416,6 +461,57 @@ const NewCampaign: FC<{ onCreated: () => void; onCancel: () => void }> = ({
         )}
       </label>
 
+      <div className="flex flex-col gap-[6px]">
+        <div>{t('ai_campaign_ai_model', 'AI model')}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-[8px]">
+          {(['premium', 'economy'] as const).map((model) => {
+            const perPost = estimatePostCost(
+              model,
+              isStory || generateImages,
+              isStory
+            );
+            return (
+              <div
+                key={model}
+                onClick={() => setAiModel(model)}
+                className={clsx(
+                  'flex flex-col gap-[4px] px-[12px] py-[10px] rounded-[8px] border cursor-pointer',
+                  aiModel === model
+                    ? 'border-[#612BD3] bg-[#612BD3]/10'
+                    : 'border-newBorder opacity-60'
+                )}
+              >
+                <div className="font-[600]">
+                  {model === 'premium'
+                    ? t('ai_campaign_model_premium', 'Premium (current)')
+                    : t('ai_campaign_model_economy', 'Economy')}
+                </div>
+                <div className="text-[12px] opacity-80">
+                  {t('ai_campaign_model_text', 'Text')}:{' '}
+                  {AI_MODELS[model].text} ·{' '}
+                  {t('ai_campaign_model_image', 'Image')}:{' '}
+                  {AI_MODELS[model].image}
+                </div>
+                <div className="text-[13px]">
+                  ≈ {formatCost(perPost)}{' '}
+                  {t('ai_campaign_per_post', 'per post')} ·{' '}
+                  <span className="font-[600]">
+                    ≈ {formatCost(perPost * Math.max(quantity || 0, 0))}{' '}
+                    {t('ai_campaign_for_campaign', 'for this campaign')}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-[12px] opacity-60">
+          {t(
+            'ai_campaign_cost_note',
+            'Estimates in US dollars charged by OpenAI. The real cost of every post is shown after it is generated.'
+          )}
+        </div>
+      </div>
+
       <div className="flex gap-[8px] justify-end">
         <Button secondary onClick={onCancel}>
           {t('cancel', 'Cancel')}
@@ -601,6 +697,11 @@ const PostCard: FC<{
           {post.error && (
             <div className="text-[12px] text-red-500">{post.error}</div>
           )}
+          {post.cost > 0 && (
+            <div className="text-[12px] opacity-60">
+              {t('ai_campaign_real_cost', 'AI cost')}: {formatCost(post.cost)}
+            </div>
+          )}
           <div className="flex flex-col gap-[4px]">
             <div className="text-[12px] opacity-70">
               {t('ai_campaign_publish_date', 'Publish date')}
@@ -682,6 +783,7 @@ const CampaignCard: FC<{
   );
   const count = (status: CampaignPost['status']) =>
     campaign.posts.filter((p) => p.status === status).length;
+  const totalCost = campaign.posts.reduce((all, p) => all + (p.cost || 0), 0);
 
   const remove = useCallback(async () => {
     if (
@@ -718,6 +820,16 @@ const CampaignCard: FC<{
                 `, ${count('generating')} ${t(
                   'ai_campaign_generating',
                   'generating'
+                )}`}
+            </span>
+            <span>·</span>
+            <span>
+              {campaign.aiModel === 'economy'
+                ? t('ai_campaign_model_economy', 'Economy')
+                : t('ai_campaign_model_premium', 'Premium (current)')}
+              {totalCost > 0 &&
+                ` · ${t('ai_campaign_real_cost', 'AI cost')}: ${formatCost(
+                  totalCost
                 )}`}
             </span>
             <span>·</span>

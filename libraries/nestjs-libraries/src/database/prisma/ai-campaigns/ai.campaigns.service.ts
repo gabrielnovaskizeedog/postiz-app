@@ -7,7 +7,10 @@ import {
   AiCampaignDto,
   AiCampaignPostDto,
 } from '@gitroom/nestjs-libraries/dtos/ai-campaigns/ai.campaign.dto';
-import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
+import {
+  AiCampaignTier,
+  OpenaiService,
+} from '@gitroom/nestjs-libraries/openai/openai.service';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -239,6 +242,7 @@ export class AiCampaignsService {
       return;
     }
 
+    const tier = campaign.aiModel as AiCampaignTier;
     const integrations = await this.getIntegrations(
       org.id,
       JSON.parse(campaign.integrations)
@@ -255,20 +259,25 @@ export class AiCampaignsService {
         const research = await this._openaiService.researchTrends(
           theme,
           campaign.language,
-          themePosts.length
+          themePosts.length,
+          tier
         );
         const generated = await this._openaiService.generateCampaignPosts({
           theme,
-          research,
+          research: research.text,
           count: themePosts.length,
           language: campaign.language,
           tone: campaign.tone || undefined,
           instructions: campaign.instructions || undefined,
           platforms,
+          tier,
         });
+        // The search and the writing are shared by the posts of the theme
+        const textCost =
+          (research.cost + generated.cost) / themePosts.length;
 
         for (const [index, post] of themePosts.entries()) {
-          const item = generated[index];
+          const item = generated.posts[index];
           if (!item) {
             await this.failPost(
               org.id,
@@ -283,6 +292,7 @@ export class AiCampaignsService {
             sources: JSON.stringify(item.sources),
             content: item.content,
             imagePrompt: item.imagePrompt,
+            cost: { increment: textCost },
             ...(campaign.generateImages ? {} : { status: 'pending' }),
           });
 
@@ -291,17 +301,19 @@ export class AiCampaignsService {
           }
 
           try {
-            const media = await this.createImage(
+            const image = await this.createImage(
               org,
               item.imagePrompt,
+              tier,
               campaign.instagramFormat === 'story'
                 ? headlineOf(item.content)
                 : undefined
             );
             await this._aiCampaignsRepository.updatePost(org.id, post.id, {
               status: 'pending',
-              imageId: media.id,
-              imagePath: media.path,
+              imageId: image.media.id,
+              imagePath: image.media.path,
+              cost: { increment: image.cost },
             });
           } catch (err) {
             // The text is still useful, the user can retry only the image
@@ -325,6 +337,7 @@ export class AiCampaignsService {
     org: Organization,
     post: NonNullable<Awaited<ReturnType<AiCampaignsRepository['getPost']>>>
   ) {
+    const tier = post.campaign.aiModel as AiCampaignTier;
     const integrations = await this.getIntegrations(
       org.id,
       JSON.parse(post.campaign.integrations)
@@ -332,28 +345,32 @@ export class AiCampaignsService {
     const research = await this._openaiService.researchTrends(
       post.theme,
       post.campaign.language,
-      3
+      3,
+      tier
     );
-    const [generated] = await this._openaiService.generateCampaignPosts({
+    const generated = await this._openaiService.generateCampaignPosts({
       theme: post.theme,
-      research,
+      research: research.text,
       count: 1,
       language: post.campaign.language,
       tone: post.campaign.tone || undefined,
       instructions: post.campaign.instructions || undefined,
       platforms: integrations.map((p) => p.providerIdentifier),
+      tier,
     });
+    const [item] = generated.posts;
 
-    if (!generated) {
+    if (!item) {
       throw new Error('The AI did not return a post');
     }
 
     await this._aiCampaignsRepository.updatePost(org.id, post.id, {
       status: 'pending',
-      trend: generated.trend,
-      sources: JSON.stringify(generated.sources),
-      content: generated.content,
-      imagePrompt: generated.imagePrompt,
+      trend: item.trend,
+      sources: JSON.stringify(item.sources),
+      content: item.content,
+      imagePrompt: item.imagePrompt,
+      cost: { increment: research.cost + generated.cost },
     });
   }
 
@@ -363,17 +380,19 @@ export class AiCampaignsService {
   ) {
     const id = post.id;
     try {
-      const media = await this.createImage(
+      const image = await this.createImage(
         org,
         post.imagePrompt!,
+        post.campaign.aiModel as AiCampaignTier,
         post.campaign.instagramFormat === 'story'
           ? headlineOf(post.content)
           : undefined
       );
       await this._aiCampaignsRepository.updatePost(org.id, id, {
         status: 'pending',
-        imageId: media.id,
-        imagePath: media.path,
+        imageId: image.media.id,
+        imagePath: image.media.path,
+        cost: { increment: image.cost },
       });
     } catch (err) {
       // The text is still there, only the new image failed
@@ -388,6 +407,7 @@ export class AiCampaignsService {
   private async createImage(
     org: Organization,
     prompt: string,
+    tier: AiCampaignTier,
     storyHeadline?: string
   ) {
     // Same credit gate as the dashboard's /media/generate-image route
@@ -396,19 +416,26 @@ export class AiCampaignsService {
       throw new Error('No AI image credits are available on this account');
     }
 
-    const image = await this._mediaService.generateImage(
+    const image = await this._mediaService.generateCampaignImage(
       storyHeadline
         ? this._openaiService.realisticStoryPrompt(prompt, storyHeadline)
         : this._openaiService.realisticPhotoPrompt(prompt),
       org,
-      false,
-      !!storyHeadline
+      !!storyHeadline,
+      tier
     );
     const file = await this.storage.uploadSimple(
-      'data:image/png;base64,' + image
+      'data:image/png;base64,' + image.b64
     );
 
-    return this._mediaService.saveFile(org.id, file.split('/').pop()!, file);
+    return {
+      cost: image.cost,
+      media: await this._mediaService.saveFile(
+        org.id,
+        file.split('/').pop()!,
+        file
+      ),
+    };
   }
 
   private async getIntegrations(orgId: string, ids: string[]) {

@@ -1113,5 +1113,14 @@
   "ai_campaign_format_story": "Story",
   "ai_campaign_format_post_description": "Foto quadrada, o texto vai na legenda",
   "ai_campaign_format_story_description": "Foto vertical com a chamada escrita nela, Story não tem legenda",
-  "ai_campaign_story_needs_image": "obrigatório para Story"
+  "ai_campaign_story_needs_image": "obrigatório para Story",
+  "ai_campaign_ai_model": "Modelo de IA",
+  "ai_campaign_model_premium": "Premium (atual)",
+  "ai_campaign_model_economy": "Econômico",
+  "ai_campaign_model_text": "Texto",
+  "ai_campaign_model_image": "Imagem",
+  "ai_campaign_per_post": "por post",
+  "ai_campaign_for_campaign": "nesta campanha",
+  "ai_campaign_cost_note": "Estimativas em dólar cobradas pela OpenAI. O custo real de cada post aparece depois que ele é gerado.",
+  "ai_campaign_real_cost": "Custo de IA"
 }

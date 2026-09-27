@@ -1115,5 +1115,14 @@
   "ai_campaign_format_story": "Story",
   "ai_campaign_format_post_description": "Square photo, the text goes in the caption",
   "ai_campaign_format_story_description": "Vertical photo with the hook written on it, stories have no caption",
-  "ai_campaign_story_needs_image": "required for stories"
+  "ai_campaign_story_needs_image": "required for stories",
+  "ai_campaign_ai_model": "AI model",
+  "ai_campaign_model_premium": "Premium (current)",
+  "ai_campaign_model_economy": "Economy",
+  "ai_campaign_model_text": "Text",
+  "ai_campaign_model_image": "Image",
+  "ai_campaign_per_post": "per post",
+  "ai_campaign_for_campaign": "for this campaign",
+  "ai_campaign_cost_note": "Estimates in US dollars charged by OpenAI. The real cost of every post is shown after it is generated.",
+  "ai_campaign_real_cost": "AI cost"
 }

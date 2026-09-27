@@ -63,6 +63,10 @@ export class AiCampaignDto {
   @IsIn(['post', 'story'])
   @IsOptional()
   instagramFormat?: 'post' | 'story';
+
+  @IsIn(['premium', 'economy'])
+  @IsOptional()
+  aiModel?: 'premium' | 'economy';
 }
 
 export class AiCampaignPostDto {

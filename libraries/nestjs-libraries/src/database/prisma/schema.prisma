@@ -717,6 +717,7 @@ model AiCampaign {
   instructions   String?
   generateImages Boolean          @default(true)
   instagramFormat String          @default("post")
+  aiModel        String           @default("premium")
   status         String           @default("generating")
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -742,6 +743,7 @@ model AiCampaignPost {
   publishDate    DateTime
   status         String       @default("generating")
   error          String?
+  cost           Float        @default(0)
   postGroup      String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

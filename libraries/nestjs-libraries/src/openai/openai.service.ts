@@ -8,6 +8,39 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
 });
 
+// Models used by AI campaigns, the user picks one tier per campaign
+export const AI_CAMPAIGN_TIERS = {
+  premium: {
+    text: 'gpt-4.1',
+    image: 'chatgpt-image-latest',
+    imageQuality: 'auto',
+  },
+  economy: {
+    text: 'gpt-4.1-mini',
+    image: 'gpt-image-1-mini',
+    imageQuality: 'medium',
+  },
+} as const;
+export type AiCampaignTier = keyof typeof AI_CAMPAIGN_TIERS;
+
+// USD per 1M tokens, https://developers.openai.com/api/docs/pricing
+const TEXT_PRICES: Record<string, { input: number; output: number }> = {
+  'gpt-4.1': { input: 2, output: 8 },
+  'gpt-4.1-mini': { input: 0.4, output: 1.6 },
+};
+const IMAGE_PRICES: Record<
+  string,
+  { text: number; image: number; output: number }
+> = {
+  'chatgpt-image-latest': { text: 5, image: 8, output: 32 },
+  'gpt-image-1-mini': { text: 2, image: 2.5, output: 8 },
+};
+const WEB_SEARCH_CALL_PRICE = 0.01;
+
+const textCost = (model: string, input = 0, output = 0) =>
+  (input * TEXT_PRICES[model].input + output * TEXT_PRICES[model].output) /
+  1_000_000;
+
 const PicturePrompt = z.object({
   prompt: z.string(),
 });
@@ -329,16 +362,62 @@ Clips must not overlap. Write the title and the post in this language, whatever 
 
   // Uses the web search tool so the angles come from what is being talked
   // about right now and not from the model's training data
-  async researchTrends(theme: string, language: string, count: number) {
+  async researchTrends(
+    theme: string,
+    language: string,
+    count: number,
+    tier: AiCampaignTier = 'premium'
+  ) {
+    const model = AI_CAMPAIGN_TIERS[tier].text;
     const research = await openai.responses.create({
-      model: 'gpt-4.1',
+      model,
       tools: [{ type: 'web_search' }],
       input: `Search the web for what is trending right now (the last days and weeks) about the theme "${theme}", for an audience that speaks ${language}.
 Find ${count} different angles that would make a strong social media post today: recent news, launches, debates, data or viral discussions.
 For every angle write a short title, two or three sentences with the concrete facts (names, numbers, dates) and the URLs of the sources you used.`,
     });
 
-    return research.output_text;
+    const searches = research.output.filter(
+      (item) => item.type === 'web_search_call'
+    ).length;
+
+    return {
+      text: research.output_text,
+      cost:
+        searches * WEB_SEARCH_CALL_PRICE +
+        textCost(
+          model,
+          research.usage?.input_tokens,
+          research.usage?.output_tokens
+        ),
+    };
+  }
+
+  // Same as generateImage but with the campaign tier model and the real cost
+  // of the picture, computed from the usage OpenAI returns
+  async generateCampaignImage(
+    prompt: string,
+    isVertical: boolean,
+    tier: AiCampaignTier = 'premium'
+  ) {
+    const { image: model, imageQuality } = AI_CAMPAIGN_TIERS[tier];
+    const generate = await openai.images.generate({
+      prompt,
+      model,
+      quality: imageQuality,
+      size: isVertical ? '1024x1536' : '1024x1024',
+    });
+    const usage = generate.usage;
+    const prices = IMAGE_PRICES[model];
+
+    return {
+      b64: generate.data![0].b64_json!,
+      cost:
+        ((usage?.input_tokens_details?.text_tokens || 0) * prices.text +
+          (usage?.input_tokens_details?.image_tokens || 0) * prices.image +
+          (usage?.output_tokens || 0) * prices.output) /
+        1_000_000,
+    };
   }
 
   async generateCampaignPosts(params: {
@@ -349,7 +428,9 @@ For every angle write a short title, two or three sentences with the concrete fa
     tone?: string;
     instructions?: string;
     platforms: string[];
+    tier?: AiCampaignTier;
   }) {
+    const model = AI_CAMPAIGN_TIERS[params.tier || 'premium'].text;
     const CampaignPostsPrompt = z.object({
       posts: z.array(
         z.object({
@@ -378,10 +459,8 @@ For every angle write a short title, two or three sentences with the concrete fa
       ),
     });
 
-    const posts =
-      (
-        await openai.chat.completions.parse({
-          model: 'gpt-4.1',
+    const completion = await openai.chat.completions.parse({
+          model,
           temperature: 0.9,
           messages: [
             {
@@ -435,17 +514,24 @@ Never use abstract or symbolic concepts: no glowing brains, circuits, holograms,
             CampaignPostsPrompt,
             'campaignPosts'
           ),
-        })
-      ).choices[0].message.parsed?.posts || [];
+        });
+    const posts = completion.choices[0].message.parsed?.posts || [];
 
     // Em dashes are the most recognisable sign of AI writing, the model
     // still slips one in from time to time
     const humanize = (text: string) => text.trim().replace(/\s*—\s*/g, ' - ');
 
-    return posts.map(({ headline, body, ...post }) => ({
-      ...post,
-      content: `${humanize(headline)}\n\n${humanize(body)}`,
-    }));
+    return {
+      cost: textCost(
+        model,
+        completion.usage?.prompt_tokens,
+        completion.usage?.completion_tokens
+      ),
+      posts: posts.map(({ headline, body, ...post }) => ({
+        ...post,
+        content: `${humanize(headline)}\n\n${humanize(body)}`,
+      })),
+    };
   }
 
   // Stories have no caption, the hook has to be written on the picture

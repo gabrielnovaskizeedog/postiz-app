@@ -70,6 +70,7 @@ export class AiCampaignsRepository {
         instructions: body.instructions,
         generateImages: body.generateImages,
         instagramFormat: body.instagramFormat || 'post',
+        aiModel: body.aiModel || 'premium',
         posts: {
           create: posts.map((p) => ({
             organizationId: orgId,

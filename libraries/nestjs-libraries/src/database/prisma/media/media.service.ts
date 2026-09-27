@@ -1,6 +1,9 @@
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { MediaRepository } from '@gitroom/nestjs-libraries/database/prisma/media/media.repository';
-import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
+import {
+  AiCampaignTier,
+  OpenaiService,
+} from '@gitroom/nestjs-libraries/openai/openai.service';
 import { generationError } from '@gitroom/nestjs-libraries/openai/generation.error';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { Organization } from '@prisma/client';
@@ -105,8 +108,7 @@ export class MediaService {
   async generateImage(
     prompt: string,
     org: Organization,
-    generatePromptFirst?: boolean,
-    isVertical = false
+    generatePromptFirst?: boolean
   ) {
     try {
       const generating = await this._subscriptionService.useCredit(
@@ -117,11 +119,29 @@ export class MediaService {
             prompt = await this._openAi.generatePromptForPicture(prompt);
             console.log('Prompt:', prompt);
           }
-          return this._openAi.generateImage(prompt, isVertical);
+          return this._openAi.generateImage(prompt);
         }
       );
 
       return generating;
+    } catch (err) {
+      throw generationError(err);
+    }
+  }
+
+  // AI campaigns pick the model tier and keep the real cost of each picture
+  async generateCampaignImage(
+    prompt: string,
+    org: Organization,
+    isVertical: boolean,
+    tier: AiCampaignTier
+  ) {
+    try {
+      return await this._subscriptionService.useCredit(
+        org,
+        'ai_images',
+        () => this._openAi.generateCampaignImage(prompt, isVertical, tier)
+      );
     } catch (err) {
       throw generationError(err);
     }
