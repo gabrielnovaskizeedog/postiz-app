@@ -17,6 +17,13 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 
 dayjs.extend(utc);
 
+// Settings some providers refuse to schedule without, campaigns publish
+// regular feed posts
+const REQUIRED_SETTINGS: Record<string, Record<string, unknown>> = {
+  instagram: { post_type: 'post' },
+  'instagram-standalone': { post_type: 'post' },
+};
+
 type CampaignPost = Awaited<
   ReturnType<AiCampaignsRepository['createCampaign']>
 >['posts'][number];
@@ -152,6 +159,7 @@ export class AiCampaignsService {
           group,
           settings: {
             __type: integration.providerIdentifier as any,
+            ...(REQUIRED_SETTINGS[integration.providerIdentifier] || {}),
           } as any,
           value: [
             {
