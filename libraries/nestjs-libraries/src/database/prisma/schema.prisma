@@ -24,6 +24,9 @@ model Organization {
   autoPost            AutoPost[]
   aiCampaigns         AiCampaign[]
   aiCampaignPosts     AiCampaignPost[]
+  brandKit            BrandKit?
+  brandPhotos         BrandPhoto[]
+  aiCarousels         AiCarousel[]
   Comments            Comments[]
   credits             Credits[]
   clippings           Clipping[]
@@ -752,6 +755,73 @@ model AiCampaignPost {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@index([campaignId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// Visual identity and voice of an organization, used by AI carousels
+model BrandKit {
+  id              String       @id @default(uuid())
+  organizationId  String       @unique
+  identity        String       @default("editorial")
+  name            String?
+  handle          String?
+  bio             String?
+  category        String?
+  avatarPath      String?
+  captionSize     String       @default("media")
+  captionTone     String       @default("leve")
+  captionEmojis   Int          @default(2)
+  captionHashtags Int          @default(3)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization    Organization @relation(fields: [organizationId], references: [id])
+}
+
+model BrandPhoto {
+  id             String       @id @default(uuid())
+  organizationId String
+  path           String
+  emotion        String
+  cutout         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([deletedAt])
+}
+
+model AiCarousel {
+  id             String       @id @default(uuid())
+  organizationId String
+  source         String
+  sourceUrl      String?
+  theme          String?
+  audience       String?
+  slidesCount    Int
+  language       String
+  integrations   String
+  publishDate    DateTime
+  aiModel        String       @default("premium")
+  status         String       @default("researching")
+  research       String?
+  sources        String?
+  hooks          String?
+  hook           String?
+  slides         String?
+  images         String?
+  caption        String?
+  cost           Float        @default(0)
+  error          String?
+  postGroup      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
   @@index([organizationId])
   @@index([status])
   @@index([deletedAt])
