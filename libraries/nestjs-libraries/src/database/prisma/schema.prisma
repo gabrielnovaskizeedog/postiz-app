@@ -785,6 +785,7 @@ model BrandPhoto {
   path           String
   emotion        String
   cutout         Boolean      @default(false)
+  ratio          Float        @default(1.5)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
@@ -803,6 +804,7 @@ model AiCarousel {
   audience       String?
   slidesCount    Int
   language       String
+  category       String?
   integrations   String
   publishDate    DateTime
   aiModel        String       @default("premium")

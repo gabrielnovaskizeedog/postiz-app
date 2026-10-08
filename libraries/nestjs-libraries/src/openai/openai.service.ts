@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { shuffle } from 'lodash';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
+import { CarouselSlide } from '@gitroom/nestjs-libraries/carousels/carousel.template';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
@@ -531,6 +532,292 @@ Never use abstract or symbolic concepts: no glowing brains, circuits, holograms,
         ...post,
         content: `${humanize(headline)}\n\n${humanize(body)}`,
       })),
+    };
+  }
+
+  // ---------- AI carousels (the carousel studio guide, step by step) ----------
+
+  // Step 7: read the article (or find the strongest trending story) and open
+  // the original source to check every number
+  async researchCarousel(params: {
+    url?: string;
+    theme?: string;
+    language: string;
+    tier?: AiCampaignTier;
+  }) {
+    const model = AI_CAMPAIGN_TIERS[params.tier || 'premium'].text;
+    const start = params.url
+      ? `Open and read this article: ${params.url}`
+      : `Search the web for what is trending right now (the last days) about "${params.theme}" for an audience that speaks ${params.language}, and pick the single strongest recent story`;
+    const research = await openai.responses.create({
+      model,
+      tools: [{ type: 'web_search' }],
+      input: `${start}.
+Then you MUST search for and open the ORIGINAL source the story is based on (the study, paper, official press release of the university or company, official announcement) and check every number, name and date against it. A news article is never the original source. If you cannot find the original, write "ORIGINAL NOT FOUND" in DIVERGENCES.
+Answer in ${params.language} with these sections:
+TOPIC: one line
+FACTS: bullet list, each fact with exact numbers, names and dates, followed by the URL where you confirmed it (prefer the original source)
+DIVERGENCES: where the article and the original source disagree, and claims of the article the original does not confirm (or "none")
+LIMITATIONS: caveats, what is not proven yet
+QUOTES: exact quotes with their author, original language and a faithful translation
+SOURCES: every URL you used, with title and date
+Never write a number that is not in the sources.`,
+    });
+    const searches = research.output.filter(
+      (item) => item.type === 'web_search_call'
+    ).length;
+
+    return {
+      text: research.output_text,
+      cost:
+        searches * WEB_SEARCH_CALL_PRICE +
+        textCost(model, research.usage?.input_tokens, research.usage?.output_tokens),
+    };
+  }
+
+  // Step 7 tip: 5 cover hooks, from the safest to the boldest
+  async generateCarouselHooks(params: {
+    research: string;
+    language: string;
+    audience?: string;
+    tier?: AiCampaignTier;
+  }) {
+    const model = AI_CAMPAIGN_TIERS[params.tier || 'premium'].text;
+    const completion = await openai.chat.completions.parse({
+      model,
+      temperature: 0.9,
+      messages: [
+        {
+          role: 'system',
+          content: `You write cover hooks for social media carousels. Using only the research, write 5 hooks for the cover, ordered from the safest to the boldest.
+Each hook: max 80 characters, understood in 2 seconds, makes the reader stop scrolling. A hook never claims more than the research says (no "before you complain", "reads your mind", "in seconds" if the source does not say so). Talk to the reader ("você", "seu"), create curiosity or tension, use a concrete image or contrast instead of technical jargon (e.g. "Seu cérebro sabe que a IA errou antes de você reclamar." beats "Novo algoritmo usa sinais cerebrais para treinar IA").
+Hook 1 is safe and informative, hook 5 is bold but still true. No clickbait lies, no emojis, no em dashes.
+Write them in this language: ${params.language}.${
+            params.audience ? ` Audience: ${params.audience}.` : ''
+          }`,
+        },
+        { role: 'user', content: params.research },
+      ],
+      response_format: zodResponseFormat(
+        z.object({ hooks: z.array(z.string()) }),
+        'carouselHooks'
+      ),
+    });
+
+    return {
+      hooks: (completion.choices[0].message.parsed?.hooks || []).slice(0, 5),
+      cost: textCost(
+        model,
+        completion.usage?.prompt_tokens,
+        completion.usage?.completion_tokens
+      ),
+    };
+  }
+
+  private carouselSlidesFormat() {
+    const column = z
+      .object({ titulo: z.string(), itens: z.array(z.string()) })
+      .nullable();
+    return zodResponseFormat(
+      z.object({
+        slides: z.array(
+          z.object({
+            type: z.enum([
+              'capa',
+              'texto',
+              'lista',
+              'numero',
+              'colunas',
+              'citacao',
+              'salvar',
+              'fechamento',
+            ]),
+            fundo: z.enum(['claro', 'escuro', 'cor']),
+            rotulo: z.string().nullable(),
+            titulo: z.string(),
+            destaque: z.string().nullable(),
+            subtitulo: z.string().nullable(),
+            itens: z.array(z.string()).nullable(),
+            numero: z.string().nullable(),
+            colunaA: column,
+            colunaB: column,
+            citacao: z.string().nullable(),
+            autor: z.string().nullable(),
+            fonte: z.string().nullable(),
+            foto: z.string().nullable(),
+          })
+        ),
+      }),
+      'carouselSlides'
+    );
+  }
+
+  private carouselSlidesRules(params: {
+    slides: number;
+    language: string;
+    audience?: string;
+    emotions: string[];
+  }) {
+    return `You design Instagram and LinkedIn carousels (1080x1350 slides) for a personal brand, following these rules strictly.
+Write in this language: ${params.language}.${
+      params.audience ? ` Audience: ${params.audience}.` : ''
+    }
+Exactly ${params.slides} slides, in this order: cover with the hook, context, development (one or more slides), a "save this" slide and a closing slide.
+ONE SLIDE, ONE IDEA. Short text: titles up to 70 characters, at most 4 list items of up to 90 characters each.
+Every slide must teach something concrete from the research (what happened, how it works, an example, what it means for the reader). No filler like "published in a renowned journal" or "promising results".
+Unused fields are null, never an empty string.
+
+Slide types and the fields they use (every other field is null):
+- capa (first slide, fundo "claro"): rotulo = 2 or 3 word tag, titulo = the hook, destaque, subtitulo = one line promise ending with "→", foto
+- texto: rotulo, titulo, destaque, subtitulo (2 short sentences), foto
+- lista: rotulo, titulo, destaque, itens, fonte
+- numero: ONLY if the research has that exact number. rotulo, titulo, destaque, numero (as written in the source, e.g. "29,2%"), subtitulo = what it means, fonte = source name and year, foto
+- colunas: comparison, rotulo, titulo, destaque, colunaA and colunaB {titulo, itens (2 or 3)}, fonte; foto is null
+- citacao: ONLY when QUOTES has an exact sentence said by a named person (researcher, executive), at most 160 characters (cut it with "(...)" if needed). citacao (faithful translation), autor (name, role, add "(tradução livre)" when translated), rotulo, foto. Never quote a news outlet, never paraphrase inside quotes; without a real quote use another type
+- salvar (second to last): titulo, destaque, itens = 3 or 4 takeaways, the main limitation of the research as the last item when there is one, fonte
+- fechamento (last): titulo like "Salva pra não perder.", destaque, subtitulo = a genuine question to the reader, foto
+
+rotulo of development slides is numbered like "01 · O que aconteceu", "02 · ...".
+destaque must be an EXACT substring of titulo, same case and accents (2 to 4 words to highlight).
+Use the original source (not the news article) for every claim; ignore claims listed in DIVERGENCES as not confirmed.
+fundo: vary between "claro", "escuro" and "cor"; use "cor" at most once.
+foto: the emotion of the photo for the slide, one of: ${
+      params.emotions.length ? params.emotions.join(', ') : 'nenhuma'
+    }, or "nenhuma". Never repeat the same emotion on consecutive slides.
+Facts: never invent numbers, names, dates or quotes; everything comes from the research. Never claim more than the source says. If something was only tested in simulation or is preliminary, say it.
+Sound human: no "No mundo atual", "Descubra como", "revolucionário", no em dashes (—), no lists of three adjectives.`;
+  }
+
+  // Steps 5, 7 and 8: the content of every slide, as JSON for the template
+  async generateCarouselSlides(params: {
+    research: string;
+    hook: string;
+    slides: number;
+    language: string;
+    audience?: string;
+    emotions: string[];
+    tier?: AiCampaignTier;
+  }) {
+    const model = AI_CAMPAIGN_TIERS[params.tier || 'premium'].text;
+    const completion = await openai.chat.completions.parse({
+      model,
+      temperature: 0.7,
+      messages: [
+        { role: 'system', content: this.carouselSlidesRules(params) },
+        {
+          role: 'user',
+          content: `Cover hook chosen by the user: ${params.hook}\n\nResearch:\n${params.research}`,
+        },
+      ],
+      response_format: this.carouselSlidesFormat(),
+    });
+
+    return {
+      slides: (completion.choices[0].message.parsed?.slides ||
+        []) as CarouselSlide[],
+      cost: textCost(
+        model,
+        completion.usage?.prompt_tokens,
+        completion.usage?.completion_tokens
+      ),
+    };
+  }
+
+  // "Pedir ajuste": applies the user's instruction to the slides
+  async reviseCarouselSlides(params: {
+    research: string;
+    current: CarouselSlide[];
+    instruction: string;
+    language: string;
+    audience?: string;
+    emotions: string[];
+    tier?: AiCampaignTier;
+  }) {
+    const model = AI_CAMPAIGN_TIERS[params.tier || 'premium'].text;
+    const completion = await openai.chat.completions.parse({
+      model,
+      temperature: 0.4,
+      messages: [
+        {
+          role: 'system',
+          content: `${this.carouselSlidesRules({
+            ...params,
+            slides: params.current.length,
+          })}
+
+You receive the current slides as JSON and an instruction from the user. Apply ONLY what the instruction asks and keep everything else exactly the same.`,
+        },
+        {
+          role: 'user',
+          content: `Instruction: ${params.instruction}\n\nCurrent slides:\n${JSON.stringify(
+            params.current
+          )}\n\nResearch:\n${params.research}`,
+        },
+      ],
+      response_format: this.carouselSlidesFormat(),
+    });
+
+    return {
+      slides: (completion.choices[0].message.parsed?.slides ||
+        params.current) as CarouselSlide[],
+      cost: textCost(
+        model,
+        completion.usage?.prompt_tokens,
+        completion.usage?.completion_tokens
+      ),
+    };
+  }
+
+  // Step 10: the caption, in the standard of the brand
+  async generateCarouselCaption(params: {
+    research: string;
+    slides: CarouselSlide[];
+    language: string;
+    size: string;
+    tone: string;
+    emojis: number;
+    hashtags: number;
+    tier?: AiCampaignTier;
+  }) {
+    const model = AI_CAMPAIGN_TIERS[params.tier || 'premium'].text;
+    const length =
+      { curta: '300 to 500', media: '600 to 1200', longa: '1200 to 2000' }[
+        params.size
+      ] || '600 to 1200';
+    const completion = await openai.chat.completions.parse({
+      model,
+      temperature: 0.8,
+      messages: [
+        {
+          role: 'system',
+          content: `Write the caption of this social media carousel in ${params.language}.
+Length: ${length} characters before the sources. Tone: ${params.tone}.
+The strongest fact in the first line. Short paragraphs of 1 to 3 sentences. End with a genuine, specific question to the reader.
+Emojis: at most ${params.emojis} in the whole text${params.emojis === 0 ? ' (none)' : ''}.
+Then a line starting with "Fontes:" citing the original sources (title, publication, date).
+Last line: exactly ${params.hashtags} relevant hashtags.
+Only facts from the research. No em dashes (—), no "No mundo atual", "Descubra como", "revolucionário".`,
+        },
+        {
+          role: 'user',
+          content: `Slides:\n${JSON.stringify(params.slides)}\n\nResearch:\n${params.research}`,
+        },
+      ],
+      response_format: zodResponseFormat(
+        z.object({ caption: z.string() }),
+        'carouselCaption'
+      ),
+    });
+
+    return {
+      caption: (completion.choices[0].message.parsed?.caption || '')
+        .trim()
+        .replace(/\s*—\s*/g, ' - '),
+      cost: textCost(
+        model,
+        completion.usage?.prompt_tokens,
+        completion.usage?.completion_tokens
+      ),
     };
   }
 

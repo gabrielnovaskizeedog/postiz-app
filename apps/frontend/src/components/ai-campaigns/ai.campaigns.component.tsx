@@ -48,7 +48,7 @@ interface Campaign {
   posts: CampaignPost[];
 }
 
-const INSTAGRAM_PROVIDERS = ['instagram', 'instagram-standalone'];
+export const INSTAGRAM_PROVIDERS = ['instagram', 'instagram-standalone'];
 
 type AiModel = 'premium' | 'economy';
 
@@ -74,7 +74,7 @@ const AI_MODELS: Record<
   },
 };
 
-const formatCost = (value: number) =>
+export const formatCost = (value: number) =>
   value.toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'USD',
@@ -90,13 +90,13 @@ const estimatePostCost = (
   AI_MODELS[model].textCost +
   (generateImages ? AI_MODELS[model][isStory ? 'story' : 'post'] : 0);
 
-const inputClassName =
+export const inputClassName =
   'w-full h-[44px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#612BD3]';
 
-const toLocalInput = (date: string | Date) =>
+export const toLocalInput = (date: string | Date) =>
   dayjs.utc(date).tz(getTimezone()).format('YYYY-MM-DDTHH:mm');
 
-const fromLocalInput = (value: string) =>
+export const fromLocalInput = (value: string) =>
   dayjs.tz(value, getTimezone()).utc().format();
 
 export const useIntegrationsList = () => {

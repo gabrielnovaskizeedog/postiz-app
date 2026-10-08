@@ -37,6 +37,8 @@ import { SignatureController } from '@gitroom/backend/api/routes/signature.contr
 import { AutopostController } from '@gitroom/backend/api/routes/autopost.controller';
 import { SetsController } from '@gitroom/backend/api/routes/sets.controller';
 import { AiCampaignsController } from '@gitroom/backend/api/routes/ai.campaigns.controller';
+import { BrandKitController } from '@gitroom/backend/api/routes/brand.kit.controller';
+import { AiCarouselsController } from '@gitroom/backend/api/routes/ai.carousels.controller';
 import { ThirdPartyController } from '@gitroom/backend/api/routes/third-party.controller';
 import { MonitorController } from '@gitroom/backend/api/routes/monitor.controller';
 import { NoAuthIntegrationsController } from '@gitroom/backend/api/routes/no.auth.integrations.controller';
@@ -74,6 +76,8 @@ const authenticatedController = [
   AutopostController,
   SetsController,
   AiCampaignsController,
+  BrandKitController,
+  AiCarouselsController,
   ThirdPartyController,
   OAuthAppController,
   ApprovedAppsController,

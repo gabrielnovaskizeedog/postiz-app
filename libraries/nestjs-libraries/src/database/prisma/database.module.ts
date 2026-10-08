@@ -39,6 +39,10 @@ import { SetsService } from '@gitroom/nestjs-libraries/database/prisma/sets/sets
 import { SetsRepository } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.repository';
 import { AiCampaignsService } from '@gitroom/nestjs-libraries/database/prisma/ai-campaigns/ai.campaigns.service';
 import { AiCampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-campaigns/ai.campaigns.repository';
+import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand.kit.service';
+import { BrandKitRepository } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand.kit.repository';
+import { AiCarouselsService } from '@gitroom/nestjs-libraries/database/prisma/ai-carousels/ai.carousels.service';
+import { AiCarouselsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-carousels/ai.carousels.repository';
 import { ThirdPartyRepository } from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.repository';
 import { ThirdPartyService } from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.service';
 import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
@@ -102,6 +106,10 @@ import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/adm
     SetsRepository,
     AiCampaignsService,
     AiCampaignsRepository,
+    BrandKitService,
+    BrandKitRepository,
+    AiCarouselsService,
+    AiCarouselsRepository,
     ThirdPartyRepository,
     ThirdPartyService,
     OAuthRepository,

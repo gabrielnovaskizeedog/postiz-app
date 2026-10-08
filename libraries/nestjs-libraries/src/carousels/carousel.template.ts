@@ -43,7 +43,9 @@ export interface CarouselBrand {
   bio: string;
   category: string;
   avatarPath?: string | null;
-  photos: Array<{ path: string; emotion: string; cutout: boolean }>;
+  // ratio = height / width of the picture: close-ups are shown smaller than
+  // full-body pictures so the face keeps the same size
+  photos: Array<{ path: string; emotion: string; cutout: boolean; ratio?: number }>;
 }
 
 const escape = (value: string | null | undefined) =>
@@ -66,6 +68,10 @@ const highlight = (title: string, words: string | null) => {
     safe.slice(index + target.length)
   );
 };
+
+// Height of a cut-out picture by its framing (full body, half body, close-up)
+const photoHeight = (ratio: number | undefined, sizes: [number, number, number]) =>
+  (ratio || 2) >= 1.6 ? sizes[0] : (ratio || 2) >= 1.25 ? sizes[1] : sizes[2];
 
 const list = (items: string[] | null, className = 'lista') =>
   items?.length
@@ -113,13 +119,19 @@ export const buildCarouselHtml = (
     const source = slide.fonte
       ? `<p class="fonte">${escape(slide.fonte)}</p>`
       : '';
+    // next to a photo the text column is narrow, titles go one size down
+    const narrow = !!photo && slide.type !== 'colunas';
     const title = (size: string) =>
-      `<h2 class="titulo ${size}">${highlight(slide.titulo, slide.destaque)}</h2>`;
+      `<h2 class="titulo ${
+        narrow ? (size === 'medio' ? 'pequeno' : size === '' ? 'medio' : size) : size
+      }">${highlight(slide.titulo, slide.destaque)}</h2>`;
 
     if (slide.type === 'capa') {
       const coverPhoto = photo
         ? photo.cutout
-          ? `<div class="capa-foto foto"><div class="circulo"></div><img src="${escape(photo.path)}" alt=""></div>`
+          ? `<div class="capa-foto foto"><div class="circulo"></div><img src="${escape(
+              photo.path
+            )}" style="height:${photoHeight(photo.ratio, [1180, 960, 800])}px" alt=""></div>`
           : `<div class="capa-foto moldura foto"><img src="${escape(photo.path)}" alt=""></div>`
         : '';
       return `
@@ -129,7 +141,9 @@ export const buildCarouselHtml = (
       )}</span><span>${escape(date)}</span></div>
   <div class="capa-texto"${photo ? '' : ' style="max-width:920px"'}>
     ${slide.rotulo ? `<span class="selo">${escape(slide.rotulo)}</span>` : ''}
-    <h1 class="titulo">${highlight(slide.titulo, slide.destaque)}</h1>
+    <h1 class="titulo${
+      slide.titulo.length > 60 ? ' pequeno' : slide.titulo.length > 42 ? ' medio' : ''
+    }">${highlight(slide.titulo, slide.destaque)}</h1>
     ${slide.subtitulo ? `<p class="sub${photo ? ' estreita' : ''}">${escape(slide.subtitulo)}</p>` : ''}
   </div>
   ${coverPhoto}
@@ -194,7 +208,11 @@ export const buildCarouselHtml = (
       photo && slide.type !== 'colunas'
         ? `<img class="foto-canto foto${photo.cutout ? '' : ' moldura'}" src="${escape(
             photo.path
-          )}" alt="">`
+          )}"${
+            photo.cutout
+              ? ` style="height:${photoHeight(photo.ratio, [700, 620, 520])}px"`
+              : ''
+          } alt="">`
         : '';
 
     return `
@@ -229,7 +247,7 @@ export const FIT_SLIDE_SCRIPT = `(index) => {
   const slide = slides[index];
   const block = slide.querySelector('.conteudo, .capa-texto');
   const footer = slide.querySelector('.rodape');
-  const obstacle = slide.querySelector('.capa-foto .circulo, .capa-foto.moldura img, .foto-canto');
+  const obstacle = slide.querySelector('.capa-foto.moldura img, .capa-foto, .foto-canto');
   if (!block || !footer) return 1;
   const textRects = () => {
     const rects = [];
@@ -247,11 +265,14 @@ export const FIT_SLIDE_SCRIPT = `(index) => {
   let scale = 1;
   for (; scale >= 0.66; scale -= 0.04) {
     block.style.setProperty('--escala', String(scale));
-    const limit = footer.getBoundingClientRect().top - 24;
+    // the footer is pushed down when the text is too long: measure against
+    // where it sits at the bottom of the slide, not where it ended up
+    const footerBox = footer.getBoundingClientRect();
+    const limit = Math.min(footerBox.top, 1350 - 64 - footerBox.height) - 24;
     const box = obstacle ? obstacle.getBoundingClientRect() : null;
     const ok = textRects().every((r) =>
       r.bottom <= limit && r.right <= 1040 &&
-      (!box || r.right <= box.left + 8 || r.bottom <= box.top + 8 || r.top >= box.bottom)
+      (!box || r.right <= box.left - 24 || r.bottom <= box.top - 12 || r.top >= box.bottom)
     );
     if (ok) break;
   }

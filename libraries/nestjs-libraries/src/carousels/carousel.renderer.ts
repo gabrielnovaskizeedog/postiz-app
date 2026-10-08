@@ -21,7 +21,11 @@ export const renderCarousel = async (html: string, slides: number) => {
     const page = await browser.newPage();
     await page.setViewport({ width: 1080, height: 1350, deviceScaleFactor: 1 });
     // Google Fonts and the brand photos are loaded from the network
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60_000 });
+    await page.setContent(html, { waitUntil: 'load', timeout: 60_000 });
+    // CSS backgrounds (avatar) and web fonts are not part of "load"
+    await page
+      .waitForNetworkIdle({ idleTime: 500, timeout: 30_000 })
+      .catch(() => undefined);
     await page.evaluate(() => document.fonts.ready);
 
     const images: Buffer[] = [];

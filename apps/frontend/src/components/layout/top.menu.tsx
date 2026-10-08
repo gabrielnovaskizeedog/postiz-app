@@ -94,6 +94,27 @@ export const useMenuItem = () => {
       path: '/ai-campaigns',
     },
     {
+      name: t('ai_carousels', 'AI Carousels'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <path
+            d="M7 4H17C18.1 4 19 4.9 19 6V18C19 19.1 18.1 20 17 20H7C5.9 20 5 19.1 5 18V6C5 4.9 5.9 4 7 4ZM2 7V17M22 7V17M9 9H15M9 12H15M9 15H12"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      path: '/carrosseis',
+    },
+    {
       name: t('analytics', 'Analytics'),
       icon: (
         <svg
